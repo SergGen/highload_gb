@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="data:image/x-icon" type="image/x-icon">
+    <title>Delay</title>
+</head>
+<body>
+<form id="send_form">
+    <label>
+        Enter range
+        <input name="range" type="number">
+    </label>
+    <br>
+    <label>
+        Number to find
+        <input name="find" type="number">
+    </label>
+    <br>
+    <button type="submit">Calc Delay</button>
+</form>
+<div>
+    <h3>Node</h3>
+    <ul id="result_node"></ul>
+</div>
+<div>
+    <h3>Browser</h3>
+    <ul id="result_browser"></ul>
+</div>
+<div>
+    <h3>Difference in Node Set faster than Array</h3>
+    <ul id="difference_node"></ul>
+</div>
+<div>
+    <h3>Difference in browser Set faster than Array</h3>
+    <ul id="difference_browser"></ul>
+</div>
+<div>
+    <h3>Difference Node faster than browser</h3>
+    <ul id="difference_browser_node"></ul>
+</div>
+<script type="module">
+    import testDelay from './test_delay.mjs';
+    const form = document.querySelector('#send_form');
+    const resultBrowser = document.querySelector('#result_browser');
+    const resultNode = document.querySelector('#result_node');
+    const differenceNode = document.querySelector('#difference_node');
+    const differenceBrowser = document.querySelector('#difference_browser');
+    const differenceBrowserNode = document.querySelector('#difference_browser_node');
+    form.addEventListener('submit', async (evt) => {
+        evt.preventDefault();
+        const formData = new FormData(form);
+        const findNumber = Number(formData.get('find'));
+        const range = Number(formData.get('range'));
+        if (range < 1 || findNumber < 0) {
+            return;
+        }
+
+        const response = await fetch(new URL('http://localhost:3000'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ range, findNumber }),
+        });
+        const resultDataNode = await response.json();
+
+        const resultDataBrowser = await testDelay(range, findNumber);
+
+        resultNode.innerHTML = '';
+        resultBrowser.innerHTML = '';
+        differenceNode.innerHTML = '';
+        differenceBrowser.innerHTML = '';
+        differenceBrowserNode.innerHTML = '';
+
+        const renderResult = (data, elemLink) => {
+            data.forEach(({name, duration}) => {
+                const el = document.createElement('li');
+                el.textContent = `${name}: ${duration}`;
+                elemLink.appendChild(el);
+            });
+        }
+        renderResult(resultDataNode, resultNode);
+        renderResult(resultDataBrowser, resultBrowser);
+
+        const renderBrowserNodeDiff = () => {
+            for(let i = 0; i < resultDataBrowser.length; i++) {
+                const differenceValue = resultDataBrowser[i].duration - resultDataNode[i].duration;
+                const el = document.createElement('li');
+                el.style.color = differenceValue >= 0 ? 'green' : 'red';
+                el.textContent = `${resultDataBrowser[i].name}Br - ${resultDataNode[i].name}Node = ${differenceValue}`;
+                differenceBrowserNode.appendChild(el);
+            }
+        }
+        renderBrowserNodeDiff();
+
+        const renderArrSetDiff = (data, elemLink) => {
+            const arrayAdd = data.filter(({name}) => name.includes('ArrayAdd'));
+            const arrayRemove = data.filter(({name}) => name.includes('ArrayRemove'));
+            const arrayFind = data.filter(({name}) => name.includes('ArrayFind'));
+            const setAdd = data.filter(({name}) => name.includes('SetAdd'));
+            const setRemove = data.filter(({name}) => name.includes('SetRemove'));
+            const setFind = data.filter(({name}) => name.includes('SetFind'));
+
+            const renderElem = (arrayEl, setEl, elemlink) => {
+                arrayEl.forEach((elemArr) => {
+                    const differenceValue = elemArr.duration - setEl.duration;
+                    const elHtml = document.createElement('li');
+                    elHtml.style.color = differenceValue >= 0 ? 'green' : 'red';
+                    elHtml.textContent = `${elemArr.name} - ${setEl.name} = ${differenceValue}`;
+                    elemlink.appendChild(elHtml);
+                });
+            }
+            renderElem(arrayAdd, setAdd[0], elemLink);
+            renderElem(arrayRemove, setRemove[0], elemLink);
+            renderElem(arrayFind, setFind[0], elemLink);
+        }
+        renderArrSetDiff(resultDataNode, differenceNode);
+        renderArrSetDiff(resultDataBrowser, differenceBrowser);
+    });
+</script>
+</body>
+</html>
